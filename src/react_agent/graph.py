@@ -116,7 +116,7 @@ builder.add_edge("tools", "call_model")
 graph = builder.compile(name="Email Assistant")
 
 # Check if a flag/environment variable exists before running
-if not os.environ.get("CONNECTION_INITIATED"):
+if os.environ.get("CONNECTION_INITIATED") == "0":
     request = composio_toolset.initiate_connection(app=App.GMAIL)
     print(f"Open this URL to authenticate: {request.redirectUrl}")
     os.environ["CONNECTION_INITIATED"] = "1"
