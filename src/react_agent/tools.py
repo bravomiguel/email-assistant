@@ -27,12 +27,65 @@ async def search(query: str) -> Optional[dict[str, Any]]:
     wrapped = TavilySearch(max_results=configuration.max_search_results)
     return cast(dict[str, Any], await wrapped.ainvoke({"query": query}))
 
+
 # Initialize ToolSet (assuming API key is in env)
-composio_toolset = ComposioToolSet()
+toolset = ComposioToolSet(api_key=os.environ["COMPOSIO_API_KEY"])
+
+
+# filter result returned by gmail fetch emails tool
+def filter_email_results(result: dict) -> dict:
+    """Filters email list to only include sender and subject."""
+    # Pass through errors or unsuccessful executions unchanged
+    if not result.get("successful") or "data" not in result:
+        return result
+
+    original_messages = result["data"].get("messages", [])
+    if not isinstance(original_messages, list):
+        return result  # Return if data format is unexpected
+
+    # keys to keep
+    keys_to_keep = [
+        "threadId",
+        "messageId",
+        "messageTimestamp",
+        "labelIds",
+        "subject",
+        "sender",
+        "to",
+        "preview",
+        "messageText",
+    ]
+
+    filtered_messages = [
+        {key: email.get(key) for key in keys_to_keep} for email in original_messages
+    ]
+
+    # trim text of long messages
+    trimmed_messages = [
+        {
+            key: "TOO LONG" if key == "messageText" and len(val) > 1000 else val
+            for key, val in email.items()
+        }
+        for email in filtered_messages
+    ]
+
+    # Construct the new result dictionary
+    processed_result = {
+        "successful": True,
+        # Use a clear key for the filtered data
+        "data": {"messages": trimmed_messages},
+        "error": None,
+    }
+    return processed_result
+
 
 # Fetch only the tool for starring a GitHub repo
-gmail_fetch_emails = composio_toolset.get_tools(
-    actions=[Action.GMAIL_FETCH_EMAILS]
+gmail_fetch_emails = toolset.get_tools(
+    actions=[Action.GMAIL_FETCH_EMAILS],
+    processors={
+        "post": {Action.GMAIL_FETCH_EMAILS: filter_email_results},
+    },
+    entity_id="miguel-bravo",
 )
 
 TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails]

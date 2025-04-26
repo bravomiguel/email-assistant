@@ -13,7 +13,7 @@ from langgraph.prebuilt import ToolNode
 
 from react_agent.configuration import Configuration
 from react_agent.state import InputState, State
-from react_agent.tools import TOOLS, composio_toolset
+from react_agent.tools import TOOLS, toolset
 from react_agent.utils import load_chat_model
 
 # Define the function that calls the model
@@ -114,9 +114,3 @@ builder.add_edge("tools", "call_model")
 
 # Compile the builder into an executable graph
 graph = builder.compile(name="Email Assistant")
-
-# Check if a flag/environment variable exists before running
-if os.environ.get("CONNECTION_INITIATED") == "0":
-    request = composio_toolset.initiate_connection(app=App.GMAIL)
-    print(f"Open this URL to authenticate: {request.redirectUrl}")
-    os.environ["CONNECTION_INITIATED"] = "1"
