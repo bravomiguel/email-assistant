@@ -31,6 +31,14 @@ async def search(query: str) -> Optional[dict[str, Any]]:
 # Initialize ToolSet (assuming API key is in env)
 toolset = ComposioToolSet(api_key=os.environ["COMPOSIO_API_KEY"])
 
+def filter_email_fetch_inputs(inputs: dict) -> dict:
+    """filter out any inputs set to None"""
+    # filtered_inputs = {key: value for key, value in inputs.items() if value is not None}
+    # return filtered_inputs
+    inputs["query"] = inputs.get("query", "")
+    inputs["label_ids"] = inputs.get("label_ids", [])
+    inputs["page_token"] = inputs.get("page_token", "")
+    return inputs
 
 # filter result returned by gmail fetch emails tool
 def filter_email_results(result: dict) -> dict:
@@ -83,6 +91,7 @@ def filter_email_results(result: dict) -> dict:
 gmail_fetch_emails = toolset.get_tools(
     actions=[Action.GMAIL_FETCH_EMAILS],
     processors={
+        "pre": {Action.GMAIL_FETCH_EMAILS: filter_email_fetch_inputs},
         "post": {Action.GMAIL_FETCH_EMAILS: filter_email_results},
     },
     entity_id="miguel-bravo",
