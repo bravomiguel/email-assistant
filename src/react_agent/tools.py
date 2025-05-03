@@ -6,11 +6,8 @@ These tools are intended as free examples to get started. For production use,
 consider implementing more robust and specialized tools tailored to your needs.
 """
 
-import os
 from typing import Any, Callable, List, Optional, cast
-
 from langchain_tavily import TavilySearch  # type: ignore[import-not-found]
-
 from composio_langgraph import Action, ComposioToolSet
 
 from react_agent.configuration import Configuration
@@ -29,7 +26,8 @@ async def search(query: str) -> Optional[dict[str, Any]]:
 
 
 # Initialize ToolSet (assuming API key is in env)
-toolset = ComposioToolSet(api_key=os.environ["COMPOSIO_API_KEY"])
+toolset = ComposioToolSet()
+
 
 def filter_email_fetch_inputs(inputs: dict) -> dict:
     """filter out any inputs set to None"""
@@ -39,6 +37,7 @@ def filter_email_fetch_inputs(inputs: dict) -> dict:
     inputs["label_ids"] = inputs.get("label_ids", [])
     inputs["page_token"] = inputs.get("page_token", "")
     return inputs
+
 
 # filter result returned by gmail fetch emails tool
 def filter_email_results(result: dict) -> dict:
@@ -87,7 +86,7 @@ def filter_email_results(result: dict) -> dict:
     return processed_result
 
 
-# Fetch only the tool for starring a GitHub repo
+# Fetch only the tool for fetching emails
 gmail_fetch_emails = toolset.get_tools(
     actions=[Action.GMAIL_FETCH_EMAILS],
     processors={
@@ -97,4 +96,9 @@ gmail_fetch_emails = toolset.get_tools(
     entity_id="miguel-bravo",
 )
 
-TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails]
+gmail_reply_to_thread = toolset.get_tools(
+    actions=[Action.GMAIL_REPLY_TO_THREAD],
+    entity_id="miguel-bravo",
+)
+
+TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread]
