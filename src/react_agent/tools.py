@@ -6,7 +6,13 @@ These tools are intended as free examples to get started. For production use,
 consider implementing more robust and specialized tools tailored to your needs.
 """
 
-from typing import Any, Callable, List, Optional, cast
+from datetime import datetime
+from typing import Annotated, Any, Callable, List, Optional, cast
+import uuid
+
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import InjectedToolArg
+from langgraph.store.base import BaseStore
 from langchain_tavily import TavilySearch  # type: ignore[import-not-found]
 from composio_langgraph import Action, ComposioToolSet
 
@@ -20,7 +26,7 @@ async def search(query: str) -> Optional[dict[str, Any]]:
     to provide comprehensive, accurate, and trusted results. It's particularly useful
     for answering questions about current events.
     """
-    configuration = Configuration.from_context()
+    configuration = Configuration.from_runnable_config()
     wrapped = TavilySearch(max_results=configuration.max_search_results)
     return cast(dict[str, Any], await wrapped.ainvoke({"query": query}))
 
@@ -101,4 +107,38 @@ gmail_reply_to_thread = toolset.get_tools(
     entity_id="miguel-bravo",
 )
 
-TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread]
+
+async def upsert_memory(
+    content: str,
+    context: str,
+    *,
+    memory_id: Optional[uuid.UUID] = None,
+    # Hide these arguments from the model.
+    config: Annotated[RunnableConfig, InjectedToolArg],
+    store: Annotated[BaseStore, InjectedToolArg],
+):
+    """Upsert a memory in the database with what happened in your last interaction with the user.
+
+    If a memory conflicts with an existing one, then just UPDATE the
+    existing one by passing in memory_id - don't create two memories
+    that are the same. If the user corrects a memory, UPDATE it.
+
+    Args:
+        content: The main content of the memory. For example:
+            "User expressed interest in learning about French."
+        context: Additional context for the memory. For example:
+            "This was mentioned while discussing career options in Europe."
+        memory_id: ONLY PROVIDE IF UPDATING AN EXISTING MEMORY.
+    """
+    mem_id = memory_id or uuid.uuid4()
+    user_id = Configuration.from_runnable_config(config).user_id
+
+    await store.aput(
+        ("memories", user_id),
+        key=str(mem_id),
+        value={"content": content, "context": context, "created_at": datetime.now().isoformat()},
+    )
+
+    return f"Stored memory {mem_id}"
+
+TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread, upsert_memory]

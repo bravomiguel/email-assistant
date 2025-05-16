@@ -40,13 +40,13 @@ class Configuration:
 
     user_id: str = field(
         default="user-01",
-        metadata={
-            "description": "The ID of the user."
-        },
+        metadata={"description": "The ID of the user."},
     )
 
     @classmethod
-    def from_context(cls) -> Configuration:
+    def from_runnable_config(
+        cls, config: Optional[RunnableConfig] = None
+    ) -> Configuration:
         """Create a Configuration instance from a RunnableConfig object."""
         try:
             config = get_config()

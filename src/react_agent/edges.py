@@ -13,7 +13,7 @@ def route_model_output(state: State) -> Literal["__end__", "tools"]:
         state (State): The current state of the conversation.
 
     Returns:
-        str: The name of the next node to call ("__end__" or "tools").
+        str: The name of the next node to call ("__end__" or "tools" or "human_review_node" or "store_memory").
     """
     last_message = state.messages[-1]
     if not isinstance(last_message, AIMessage):
@@ -27,5 +27,8 @@ def route_model_output(state: State) -> Literal["__end__", "tools"]:
     # Otherwise we execute the requested actions
     if last_message.tool_calls[-1].get("name", "") == "GMAIL_REPLY_TO_THREAD":
         return "human_review_node"
+
+    if last_message.tool_calls[-1].get("name", "") == "upsert_memory":
+        return "store_memory"
 
     return "tools"

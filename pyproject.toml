@@ -21,7 +21,8 @@ dependencies = [
     "langchain_community>=0.0.1",
     "pydantic>=2.5.2",
     "trustcall>=0.0.1",
-    "composio_langgraph>=0.0.1"
+    "composio_langgraph>=0.0.1",
+    "asyncio>=0.0.1"
 ]
 
 
