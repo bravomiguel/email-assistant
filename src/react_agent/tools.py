@@ -141,4 +141,4 @@ async def upsert_memory(
 
     return f"Stored memory {mem_id}"
 
-TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread, upsert_memory]
+TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread]

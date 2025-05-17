@@ -3,5 +3,11 @@
   "graphs": {
     "agent": "./src/react_agent/graph.py:graph"
   },
-  "env": ".env"
+  "env": ".env",
+  "store": {
+    "index": {
+      "dims": 1536,
+      "embed": "openai:text-embedding-3-small"
+    }
+  }
 }

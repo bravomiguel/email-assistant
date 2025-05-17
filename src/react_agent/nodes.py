@@ -7,14 +7,89 @@ from langchain_core.messages import AIMessage
 from langgraph.types import Command, interrupt
 from langgraph.store.base import BaseStore
 
+from react_agent.prompts import STORE_MEMORY_INSTRUCTION
 from react_agent.utils import load_chat_model
 from react_agent.state import State
 from react_agent.configuration import Configuration
-from react_agent.tools import TOOLS, gmail_reply_to_thread, upsert_memory
+from react_agent.tools import (
+    TOOLS,
+    gmail_reply_to_thread,
+    upsert_memory,
+    gmail_fetch_emails,
+    search,
+)
+
 
 tools = ToolNode(TOOLS)
 
 gmail_reply_node = ToolNode(gmail_reply_to_thread)
+
+
+async def call_model(
+    state: State, config: RunnableConfig, store: BaseStore
+) -> Dict[str, List[AIMessage]]:
+    """Call the LLM powering our "agent".
+
+    This function prepares the prompt, initializes the model, and processes the response.
+
+    Args:
+        state (State): The current state of the conversation.
+        config (RunnableConfig): Configuration for the model run.
+        store (BaseStore): The store to use for memories.
+
+    Returns:
+        dict: A dictionary containing the model's response message.
+    """
+    configuration = Configuration.from_runnable_config(config)
+
+    # Initialize the model with tool binding. Change the model or add more tools here.
+    model = load_chat_model(configuration.model).bind_tools(TOOLS)
+
+    # get the last message
+    last_message = state.messages[-1]
+
+    # load in relevant memories
+    memories = await store.asearch(
+        ("memories", configuration.user_id),
+        query=last_message.content,
+        limit=3,
+    )
+
+    # format memories
+    mem_formatted = (
+        "\n".join(
+            f"[{mem.key}]: {mem.value} (similarity: {mem.score})" for mem in memories
+        )
+        if memories
+        else ""
+    )
+
+    # Format the system prompt. Customize this to change the agent's behavior.
+    system_message = configuration.system_prompt.format(
+        memories=mem_formatted, system_time=datetime.now().isoformat()
+    )
+
+    # Get the model's response
+    response = cast(
+        AIMessage,
+        await model.ainvoke(
+            [{"role": "system", "content": system_message}, *state.messages]
+        ),
+    )
+
+    # Handle the case when it's the last step and the model still wants to use a tool
+    if state.is_last_step and response.tool_calls:
+        return {
+            "messages": [
+                AIMessage(
+                    id=response.id,
+                    content="Sorry, I could not find an answer to your question in the specified number of steps.",
+                )
+            ]
+        }
+
+    # Return the model's response as a list to be added to existing messages
+    return {"messages": [response]}
 
 
 async def human_review_node(state: State) -> Command:
@@ -71,49 +146,27 @@ async def human_review_node(state: State) -> Command:
         return Command(goto="call_model", update={"messages": [tool_message]})
 
 
-async def call_model(
-    state: State, config: RunnableConfig, store: BaseStore
-) -> Dict[str, List[AIMessage]]:
-    """Call the LLM powering our "agent".
+async def memory_manager(state: State, config: RunnableConfig, store: BaseStore):
+    """Reflect on the chat history and write a memory to the store about the latest interaction, as well as updating recent memories as appropriate"""
 
-    This function prepares the prompt, initializes the model, and processes the response.
-
-    Args:
-        state (State): The current state of the conversation.
-        config (RunnableConfig): Configuration for the model run.
-        store (BaseStore): The store to use for memories.
-
-    Returns:
-        dict: A dictionary containing the model's response message.
-    """
     configuration = Configuration.from_runnable_config(config)
 
     # Initialize the model with tool binding. Change the model or add more tools here.
-    model = load_chat_model(configuration.model).bind_tools(TOOLS)
+    model = load_chat_model(configuration.model).bind_tools([upsert_memory])
 
-    # get the last message
-    last_message = state.messages[-1]
-
-    # load in relevant memories
     memories = await store.asearch(
         ("memories", configuration.user_id),
-        query=last_message.content,
-        limit=3,
     )
 
-    # format memories
-    mem_formatted = (
-        "\n".join(
+    recent_memories = sorted(
+        memories, key=lambda mem: mem.value.get("created_at"), reverse=True
+    )[:10]
+
+    system_message = STORE_MEMORY_INSTRUCTION.format(
+        recent_memories="\n".join(
             f"[{mem.key}]: {mem.value} (similarity: {mem.score})"
-            for mem in memories
+            for mem in recent_memories
         )
-        if memories
-        else ""
-    )
-
-    # Format the system prompt. Customize this to change the agent's behavior.
-    system_message = configuration.system_prompt.format(
-        memories=mem_formatted, system_time=datetime.now().isoformat()
     )
 
     # Get the model's response
@@ -124,22 +177,13 @@ async def call_model(
         ),
     )
 
-    # Handle the case when it's the last step and the model still wants to use a tool
-    if state.is_last_step and response.tool_calls:
-        return {
-            "messages": [
-                AIMessage(
-                    id=response.id,
-                    content="Sorry, I could not find an answer to your question in the specified number of steps.",
-                )
-            ]
-        }
-
-    # Return the model's response as a list to be added to existing messages
     return {"messages": [response]}
 
 
-async def store_memory(state: State, config: RunnableConfig, store: BaseStore):
+async def store_memory(
+    state: State, config: RunnableConfig, store: BaseStore
+):
+
     tool_calls = state.messages[-1].tool_calls
 
     saved_memories = await asyncio.gather(
