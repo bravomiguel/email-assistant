@@ -1,24 +1,27 @@
 import asyncio
 from typing import Dict, List, cast
 from datetime import datetime
+import uuid
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import AIMessage
 from langgraph.types import Command, interrupt
 from langgraph.store.base import BaseStore
+from langchain_openai import ChatOpenAI
+from react_agent.schemas import Profile
+from trustcall import create_extractor
 
-from react_agent.prompts import STORE_MEMORY_INSTRUCTION
+from react_agent.prompts import (
+    CREATE_EMAIL_PRIORITIZATION_INSTRUCTIONS,
+    CREATE_WRITING_STYLE_INSTRUCTIONS,
+    TRUSTCALL_INSTRUCTION,
+)
 from react_agent.utils import load_chat_model
 from react_agent.state import State
 from react_agent.configuration import Configuration
-from react_agent.tools import (
-    TOOLS,
-    gmail_reply_to_thread,
-    upsert_memory,
-    gmail_fetch_emails,
-    search,
-)
+from react_agent.tools import TOOLS, gmail_reply_to_thread
 
+gpt_4o_mini = ChatOpenAI(model="gpt-4o-mini")
 
 tools = ToolNode(TOOLS)
 
@@ -45,28 +48,9 @@ async def call_model(
     # Initialize the model with tool binding. Change the model or add more tools here.
     model = load_chat_model(configuration.model).bind_tools(TOOLS)
 
-    # get the last message
-    last_message = state.messages[-1]
-
-    # load in relevant memories
-    memories = await store.asearch(
-        ("memories", configuration.user_id),
-        query=last_message.content,
-        limit=3,
-    )
-
-    # format memories
-    mem_formatted = (
-        "\n".join(
-            f"[{mem.key}]: {mem.value} (similarity: {mem.score})" for mem in memories
-        )
-        if memories
-        else ""
-    )
-
     # Format the system prompt. Customize this to change the agent's behavior.
     system_message = configuration.system_prompt.format(
-        memories=mem_formatted, system_time=datetime.now().isoformat()
+        system_time=datetime.now().isoformat()
     )
 
     # Get the model's response
@@ -92,7 +76,7 @@ async def call_model(
     return {"messages": [response]}
 
 
-async def human_review_node(state: State) -> Command:
+async def human_review(state: State) -> Command:
     """Handle human review of the email reply."""
     last_message = state.messages[-1]
 
@@ -104,7 +88,7 @@ async def human_review_node(state: State) -> Command:
     if tool_call.get("name", "") != "GMAIL_REPLY_TO_THREAD":
         return Command(goto="tools")
 
-    human_review = interrupt(
+    review = interrupt(
         {
             "question": "Ready to send?",
             "recipient_email": tool_call.get("args", {}).get("recipient_email", ""),
@@ -112,9 +96,9 @@ async def human_review_node(state: State) -> Command:
         }
     )
 
-    action = human_review.get("action")
-    edits = human_review.get("edits")
-    reject_feedback = human_review.get("reject_feedback")
+    action = review.get("action")
+    edits = review.get("edits")
+    feedback = review.get("feedback")
 
     if action == "send":
         return Command(goto="tools")
@@ -138,7 +122,7 @@ async def human_review_node(state: State) -> Command:
     if action == "reject":
         tool_message = {
             "role": "tool",
-            "content": f"Reply rejected by the user. User feedback: {reject_feedback}",
+            "content": f"Reply rejected by the user. User feedback: {feedback}",
             "name": tool_call["name"],
             "tool_call_id": tool_call["id"],
         }
@@ -146,57 +130,134 @@ async def human_review_node(state: State) -> Command:
         return Command(goto="call_model", update={"messages": [tool_message]})
 
 
-async def memory_manager(state: State, config: RunnableConfig, store: BaseStore):
-    """Reflect on the chat history and write a memory to the store about the latest interaction, as well as updating recent memories as appropriate"""
+async def user_profile(state: State, config: RunnableConfig, store: BaseStore):
+    """Reflect on the chat history and update user profile."""
 
-    configuration = Configuration.from_runnable_config(config)
+    # get user id
+    user_id = Configuration.from_runnable_config(config).user_id
 
-    # Initialize the model with tool binding. Change the model or add more tools here.
-    model = load_chat_model(configuration.model).bind_tools([upsert_memory])
-
-    memories = await store.asearch(
-        ("memories", configuration.user_id),
+    # get user profile from store and format for trustcall
+    profile_store = await store.asearch(("user_profile", user_id))
+    profile = (
+        [(item.key, "Profile", item.value) for item in profile_store]
+        if profile_store
+        else None
     )
 
-    recent_memories = sorted(
-        memories, key=lambda mem: mem.value.get("created_at"), reverse=True
-    )[:10]
-
-    system_message = STORE_MEMORY_INSTRUCTION.format(
-        recent_memories="\n".join(
-            f"[{mem.key}]: {mem.value} (similarity: {mem.score})"
-            for mem in recent_memories
+    # run trustcall on messages and profile (prep system prompt)
+    profile_extractor = create_extractor(
+        gpt_4o_mini, tools=[Profile], tool_choice="Profile"
+    )
+    system_prompt = TRUSTCALL_INSTRUCTION.format(time=datetime.now().isoformat())
+    messages = list(
+        merge_message_runs(
+            messages=[SystemMessage(content=system_prompt)] + state["messages"][:-1]
         )
     )
 
-    # Get the model's response
-    response = cast(
-        AIMessage,
-        await model.ainvoke(
-            [{"role": "system", "content": system_message}, *state.messages]
-        ),
+    result = profile_extractor.invoke({"messages": messages, "existing": profile})
+
+    # update profile in store with trustcall response
+    for response, response_metadata in zip(
+        result["responses"], result["response_metadata"]
+    ):
+        store.put(
+            ("user_profile", user_id),
+            response_metadata.get("json_doc_id", str(uuid.uuid4())),
+            response.model_dump(mode="json"),
+        )
+
+    # return tool message confirming profile updated successfully
+    return {
+        "messages": [
+            {
+                "role": "tool",
+                "content": "User profile updated",
+                "tool_call_id": state["messages"][-1].tool_calls[0]["id"],
+            }
+        ]
+    }
+
+
+async def writing_style(state: State, config: RunnableConfig, store: BaseStore):
+    """Reflect on the chat history and update writing style instructions."""
+
+    # get user id
+    user_id = Configuration.from_runnable_config(config).user_id
+
+    # get existing instructions from store
+    existing_instructions = await store.asearch(
+        ("instructions", user_id), "writing_style_instructions"
     )
 
-    return {"messages": [response]}
-
-
-async def store_memory(
-    state: State, config: RunnableConfig, store: BaseStore
-):
-
-    tool_calls = state.messages[-1].tool_calls
-
-    saved_memories = await asyncio.gather(
-        *(upsert_memory(**tc["args"], config=config, store=store) for tc in tool_calls)
+    # prep system prompt
+    system_prompt = CREATE_WRITING_STYLE_INSTRUCTIONS.format(
+        existing_instructions=(
+            existing_instructions.value if existing_instructions else ""
+        )
     )
 
-    results = [
-        {
-            "role": "tool",
-            "content": mem,
-            "tool_call_id": tc["id"],
-        }
-        for tc, mem in zip(tool_calls, saved_memories)
-    ]
+    # invoke model to generate writing style instructions, based on chat history
+    response = gpt_4o_mini.ainvoke(
+        [{"role": "system", "content": system_prompt}, *state.messages]
+    )
 
-    return {"messages": results}
+    # update writing style instructions in store
+    await store.aput(
+        ("instructions", user_id),
+        "writing_style_instructions",
+        {"instructions": response.content},
+    )
+
+    # return tool message confirming instructions updated
+    return {
+        "messages": [
+            {
+                "role": "tool",
+                "content": "Writing style instructions updated",
+                "tool_call_id": state["messages"][-1].tool_calls[0]["id"],
+            }
+        ]
+    }
+
+
+async def email_priorities(state: State, config: RunnableConfig, store: BaseStore):
+    """Reflect on the chat history and update email prioritization instructions."""
+
+    # get user id
+    user_id = Configuration.from_runnable_config(config).user_id
+
+    # get existing instructions from store
+    existing_instructions = await store.asearch(
+        ("instructions", user_id), "email_prioritization_instructions"
+    )
+
+    # prep system prompt
+    system_prompt = CREATE_EMAIL_PRIORITIZATION_INSTRUCTIONS.format(
+        existing_instructions=(
+            existing_instructions.value if existing_instructions else ""
+        )
+    )
+
+    # invoke model to generate email prioritization instructions, based on chat history
+    response = gpt_4o_mini.ainvoke(
+        [{"role": "system", "content": system_prompt}, *state.messages]
+    )
+
+    # update email prioritization instructions in store
+    await store.aput(
+        ("instructions", user_id),
+        "email_prioritization_instructions",
+        {"instructions": response.content},
+    )
+
+    # return tool message confirming instructions updated
+    return {
+        "messages": [
+            {
+                "role": "tool",
+                "content": "Email prioritization instructions updated",
+                "tool_call_id": state["messages"][-1].tool_calls[0]["id"],
+            }
+        ]
+    }

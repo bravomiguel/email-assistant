@@ -1,0 +1,29 @@
+from typing import List, Optional
+from pydantic import BaseModel, Field
+from datetime import datetime
+
+
+class Connection(BaseModel):
+    person: str = Field(description="The full name of the person.")
+    relation: str = Field(
+        description="The relationship to the user, e.g. brother, colleague."
+    )
+
+
+# user profile schema
+class Profile(BaseModel):
+    """This is the profile of the user you are chatting with."""
+
+    name: Optional[str] = Field(description="The name of the user.", default=None)
+    location: Optional[str] = Field(
+        description="Where the user lives. Include place and state name, e.g. Austin, TX",
+        default=None,
+    )
+    job: Optional[str] = Field(
+        description="The user's job. Include company name and title if possible, e.g. Software Engineer at Google",
+        default=None,
+    )
+    connections: List[Connection] = Field(
+        description="List of people the user knows, with their name and relationship.",
+        default_factory=list,
+    )

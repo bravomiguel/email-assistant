@@ -2,11 +2,6 @@
 
 SYSTEM_PROMPT = """You are an expert AI email assistant.
 
-Here are your memories from previous conversations with the user, which are relevant to their latest message (note, memories could be empty):
-<Memories>
-{memories}
-</Memories>
-
 Instructions for reasoning about the message history and calling tools:
 1. Reason carefully about the message history as presented below.
 
@@ -35,23 +30,39 @@ Instructions for reasoning about the message history and calling tools:
 
 Current time: {system_time}"""
 
-STORE_MEMORY_INSTRUCTION = """
-You are collecting memories about user interactions in order to improve your responses.
 
-<recent_memories>
-MOST RECENT 10 MEMORIES:
-{recent_memories}
-</recent_memories>
+TRUSTCALL_INSTRUCTION = """
+Reflect on following interaction. 
 
+Use the provided tools to retain any necessary memories about the user. 
+
+Just do one tool call at a time.
+
+System Time: {time}
+"""
+
+CREATE_WRITING_STYLE_INSTRUCTIONS = """ 
+Reflect on the following chat history.
+
+Based on this, update your writing style instructions when drafting emails on behalf of the user.
+
+Use any feedback from the user to update the writing style instructions based on the user's preferences.
+
+Below are the existing writing style instructions (may be blank):
 <instructions>
-INSTRUCTIONS:
-1. Review the chat history below carefully
-2. Write a new memory about what happened in the last user interaction by calling the upsert_memory tool.
-  - Example content: "User asked to see unread emails and I showed him emails from: amazon about his book delivery (messageId: 196db98260d2c4e0); from John Doe about a job opportunity (messageId: 196db98260d2c4e1); and from Jane Smith about a meeting request (messageId: 196db98260d2c4e2)."
-3. Review recent memories and update them if necessary based on the chat history, by calling the upsert_memory tool. Example usage above.
-4. You can do tool calls concurrently with upsert_memory tool calls.
-5. IMPORTANT: Never reply to the user. Your only job is to use the upsert_memory tool.
+{existing_instructions}
+</instructions>
+"""
 
-Remember: Only include factual information about what happened in each interaction. Do not make assumptions or inferences.
+CREATE_EMAIL_PRIORITIZATION_INSTRUCTIONS = """ 
+Reflect on the following chat history.
+
+Based on this, update your email prioritization instructions when drafting emails on behalf of the user.
+
+Use any feedback from the user to update the email prioritization instructions based on the user's preferences.
+
+Below are the existing email prioritization instructions (may be blank):
+<instructions>
+{existing_instructions}
 </instructions>
 """

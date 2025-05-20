@@ -1,13 +1,5 @@
-"""This module provides example tools for web scraping and search functionality.
-
-It includes a basic Tavily search function (as an example)
-
-These tools are intended as free examples to get started. For production use,
-consider implementing more robust and specialized tools tailored to your needs.
-"""
-
 from datetime import datetime
-from typing import Annotated, Any, Callable, List, Optional, cast
+from typing import Annotated, Any, Callable, List, Literal, Optional, TypedDict, cast
 import uuid
 
 from langchain_core.runnables import RunnableConfig
@@ -136,9 +128,21 @@ async def upsert_memory(
     await store.aput(
         ("memories", user_id),
         key=str(mem_id),
-        value={"content": content, "context": context, "created_at": datetime.now().isoformat()},
+        value={
+            "content": content,
+            "context": context,
+            "created_at": datetime.now().isoformat(),
+        },
     )
 
     return f"Stored memory {mem_id}"
+
+
+# Update memory tool (just control tool arg, output handled in node return logic)
+class UpdateMemory(TypedDict):
+    """Decision on what memory type to update."""
+
+    memory_type: Literal["user_profile", "writing_style", "email_priorities"]
+
 
 TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread]

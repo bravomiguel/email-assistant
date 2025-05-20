@@ -12,21 +12,24 @@ def route_model_output(state: State):
 
     Args:
         state (State): The current state of the conversation.
-
-    Returns:
-        str: The name of the next node to call ("tools" or "human_review_node" or "memory_manager").
     """
     last_message = state.messages[-1]
     if not isinstance(last_message, AIMessage):
         raise ValueError(
             f"Expected AIMessage in output edges, but got {type(last_message).__name__}"
         )
-    # If there is no tool call, then we finish
+    # if there is no tool call, then we finish
     if not last_message.tool_calls:
-        return "memory_manager"
+        return "__end__"
 
-    # Otherwise we execute the requested actions
+    # if tool call is UpdateMemory, route to relevant memory update node based on memory type arg
+    memory_type = last_message.tool_calls[0].get("args", {}).get("memory_type", None)
+    if memory_type:
+        return memory_type
+
+    # if tool call is GMAIL_REPLY_TO_THREAD, route to human review node
     if last_message.tool_calls[-1].get("name", "") == "GMAIL_REPLY_TO_THREAD":
-        return "human_review_node"
+        return "human_review"
 
+    # otherwise, route to tools node and execute relevant action
     return "tools"
