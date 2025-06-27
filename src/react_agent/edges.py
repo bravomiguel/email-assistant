@@ -18,8 +18,12 @@ def route_model_output(state: State):
         raise ValueError(
             f"Expected AIMessage in output edges, but got {type(last_message).__name__}"
         )
-    # if there is no tool call, then we finish
+    # if there is no tool call, check if we need to generate a title
     if not last_message.tool_calls:
+        # Only route to generate_thread_title if we don't have a title yet
+        if not state.thread_title:
+            return "generate_thread_title"
+        # Otherwise, go directly to end
         return "__end__"
 
     # if tool call is UpdateMemory, route to relevant memory update node based on memory type arg
@@ -28,7 +32,10 @@ def route_model_output(state: State):
         return memory_type
 
     # if tool call is GMAIL_REPLY_TO_THREAD, route to human review node
-    if last_message.tool_calls[-1].get("name", "") == "GMAIL_REPLY_TO_THREAD":
+    if last_message.tool_calls[-1].get("name", "") in [
+        "GMAIL_REPLY_TO_THREAD",
+        "GMAIL_SEND_EMAIL",
+    ]:
         return "human_review"
 
     # otherwise, route to tools node and execute relevant action

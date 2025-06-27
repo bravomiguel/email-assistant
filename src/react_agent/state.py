@@ -52,6 +52,14 @@ class State(InputState):
     This is a 'managed' variable, controlled by the state machine rather than user code.
     It is set to 'True' when the step count reaches recursion_limit - 1.
     """
+    
+    thread_title: str = field(default="")
+    """
+    A 4-word summary title for the conversation thread.
+    
+    This is generated when the AI responds to a human without tool calls and is used
+    as a title for the thread in the frontend UI.
+    """
 
     # Additional attributes can be added here as needed.
     # Common examples include:

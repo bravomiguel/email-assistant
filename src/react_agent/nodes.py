@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict, List, cast
 from datetime import datetime
 import uuid
@@ -85,7 +84,7 @@ async def human_review(state: State) -> Command:
 
     tool_call = last_message.tool_calls[-1]
 
-    if tool_call.get("name", "") != "GMAIL_REPLY_TO_THREAD":
+    if tool_call.get("name", "") not in ["GMAIL_REPLY_TO_THREAD", "GMAIL_SEND_EMAIL"]:
         return Command(goto="tools")
 
     review = interrupt(
@@ -93,6 +92,7 @@ async def human_review(state: State) -> Command:
             "question": "Ready to send?",
             "recipient_email": tool_call.get("args", {}).get("recipient_email", ""),
             "message_body": tool_call.get("args", {}).get("message_body", ""),
+            "body": tool_call.get("args", {}).get("body", ""),
         }
     )
 
@@ -261,3 +261,36 @@ async def email_priorities(state: State, config: RunnableConfig, store: BaseStor
             }
         ]
     }
+
+
+async def generate_thread_title(state: State, config: RunnableConfig, store: BaseStore):
+    """Generate a 4-word summary title for the conversation thread.
+
+    This function is called when the AI responds to a human without tool calls.
+    It analyzes the conversation history and creates a concise title that will
+    be displayed in the frontend UI.
+
+    Args:
+        state (State): The current state of the conversation.
+        config (RunnableConfig): Configuration for the model run.
+        store (BaseStore): The store to use for memories.
+
+    Returns:
+        dict: Updated state with the thread_title field set.
+    """
+    # Prepare system prompt for title generation
+    system_prompt = "Generate a concise 4-word title that summarizes the conversation thread. The title should capture the main topic or purpose of the conversation."
+
+    # Get the conversation history
+    messages = state.messages
+
+    # Invoke model to generate the title
+    response = await gpt_4o_mini.ainvoke(
+        [{"role": "system", "content": system_prompt}, *messages]
+    )
+
+    # Extract the title (trim to ensure it's exactly 4 words)
+    title = " ".join(response.content.strip().split()[:4])
+
+    # Return the state with the thread_title field updated
+    return {"thread_title": title}

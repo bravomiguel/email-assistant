@@ -95,6 +95,10 @@ gmail_fetch_emails = toolset.get_tools(
     },
 )
 
+gmail_send_email = toolset.get_tools(
+    actions=[Action.GMAIL_SEND_EMAIL],
+)
+
 gmail_reply_to_thread = toolset.get_tools(
     actions=[Action.GMAIL_REPLY_TO_THREAD],
 )
@@ -145,4 +149,4 @@ class UpdateMemory(TypedDict):
     memory_type: Literal["user_profile", "writing_style", "email_priorities"]
 
 
-TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread]
+TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread, *gmail_send_email]

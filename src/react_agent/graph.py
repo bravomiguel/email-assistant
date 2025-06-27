@@ -10,6 +10,7 @@ from react_agent.state import InputState, State
 from react_agent.nodes import (
     call_model,
     email_priorities,
+    generate_thread_title,
     human_review,
     tools,
     user_profile,
@@ -27,6 +28,7 @@ builder.add_node("human_review", human_review)
 builder.add_node("user_profile", user_profile)
 builder.add_node("writing_style", writing_style)
 builder.add_node("email_priorities", email_priorities)
+builder.add_node("generate_thread_title", generate_thread_title)
 
 # Set the entrypoint as `call_model`
 builder.add_edge("__start__", "call_model")
@@ -49,6 +51,7 @@ builder.add_edge("tools", "call_model")
 builder.add_edge("user_profile", "call_model")
 builder.add_edge("writing_style", "call_model")
 builder.add_edge("email_priorities", "call_model")
+builder.add_edge("generate_thread_title", "__end__")
 
 # Compile the builder into an executable graph
 graph = builder.compile(name="Email Assistant")
