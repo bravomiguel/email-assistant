@@ -3,16 +3,17 @@ from typing import Annotated, Any, Callable, List, Literal, Optional, TypedDict,
 import uuid
 
 from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import InjectedToolArg
+from langchain_core.tools import InjectedToolArg, tool
 from langgraph.store.base import BaseStore
 from langchain_tavily import TavilySearch
 from composio_langgraph import Action, ComposioToolSet
 from react_agent.dynamic_composio_toolset import DynamicEntityComposioToolSet
 
 from react_agent.configuration import Configuration
+from pydantic import BaseModel, Field
 
 
-async def search(query: str) -> Optional[dict[str, Any]]:
+async def search_web(query: str) -> Optional[dict[str, Any]]:
     """Search for general web results.
 
     This function performs a search using the Tavily search engine, which is designed
@@ -103,50 +104,33 @@ gmail_reply_to_thread = toolset.get_tools(
     actions=[Action.GMAIL_REPLY_TO_THREAD],
 )
 
+# class UpdateMemorySchema(BaseModel):
+#     """Update memory input schema"""
 
-async def upsert_memory(
-    content: str,
-    context: str,
-    *,
-    memory_id: Optional[uuid.UUID] = None,
-    # Hide these arguments from the model.
-    config: Annotated[RunnableConfig, InjectedToolArg],
-    store: Annotated[BaseStore, InjectedToolArg],
-):
-    """Upsert a memory in the database with what happened in your last interaction with the user.
-
-    If a memory conflicts with an existing one, then just UPDATE the
-    existing one by passing in memory_id - don't create two memories
-    that are the same. If the user corrects a memory, UPDATE it.
-
-    Args:
-        content: The main content of the memory. For example:
-            "User expressed interest in learning about French."
-        context: Additional context for the memory. For example:
-            "This was mentioned while discussing career options in Europe."
-        memory_id: ONLY PROVIDE IF UPDATING AN EXISTING MEMORY.
-    """
-    mem_id = memory_id or uuid.uuid4()
-    user_id = Configuration.from_runnable_config(config).user_id
-
-    await store.aput(
-        ("memories", user_id),
-        key=str(mem_id),
-        value={
-            "content": content,
-            "context": context,
-            "created_at": datetime.now().isoformat(),
-        },
-    )
-
-    return f"Stored memory {mem_id}"
+#     memory_type: Literal["user_profile", "writing_style"] = Field(
+#         description="The type of memory to update. Either 'user_profile' for user preferences/background or 'writing_style' for writing style information."
+#     )
 
 
 # Update memory tool (just control tool arg, output handled in node return logic)
-class UpdateMemory(TypedDict):
-    """Decision on what memory type to update."""
+@tool("UPDATE_MEMORY")
+def update_memory(memory_type: Literal["user_profile", "writing_style"]) -> str:
+    """Update a specific type of memory in the system.
 
-    memory_type: Literal["user_profile", "writing_style", "email_priorities"]
+    Args:
+        memory_type: The type of memory to update. One of:
+            - "user_profile": Information about the user's preferences, background, etc.
+            - "writing_style": Information about the user's writing style.
+    """
+    # This function is a control tool that just passes the memory_type to be handled by the appropriate node
+    # The actual memory update implementation is in the respective nodes
+    return f"Updating memory type: {memory_type}"
 
 
-TOOLS: List[Callable[..., Any]] = [search, *gmail_fetch_emails, *gmail_reply_to_thread, *gmail_send_email]
+TOOLS: List[Callable[..., Any]] = [
+    search_web,
+    *gmail_fetch_emails,
+    *gmail_reply_to_thread,
+    *gmail_send_email,
+    update_memory,
+]

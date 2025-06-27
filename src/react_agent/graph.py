@@ -9,7 +9,6 @@ from react_agent.configuration import Configuration
 from react_agent.state import InputState, State
 from react_agent.nodes import (
     call_model,
-    email_priorities,
     generate_thread_title,
     human_review,
     tools,
@@ -27,7 +26,6 @@ builder.add_node("tools", tools)
 builder.add_node("human_review", human_review)
 builder.add_node("user_profile", user_profile)
 builder.add_node("writing_style", writing_style)
-builder.add_node("email_priorities", email_priorities)
 builder.add_node("generate_thread_title", generate_thread_title)
 
 # Set the entrypoint as `call_model`
@@ -37,20 +35,11 @@ builder.add_edge("__start__", "call_model")
 builder.add_conditional_edges(
     "call_model",
     route_model_output,
-    # [
-    #     "tools",
-    #     "human_review",
-    #     "user_profile",
-    #     "writing_style",
-    #     "email_priorities",
-    #     "__end__",
-    # ],
 )
 
 builder.add_edge("tools", "call_model")
 builder.add_edge("user_profile", "call_model")
 builder.add_edge("writing_style", "call_model")
-builder.add_edge("email_priorities", "call_model")
 builder.add_edge("generate_thread_title", "__end__")
 
 # Compile the builder into an executable graph

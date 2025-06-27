@@ -24,6 +24,6 @@ class Profile(BaseModel):
         default=None,
     )
     connections: List[Connection] = Field(
-        description="List of people the user knows, with their name, relationship, and email address",
+        description="List of people the user knows, with their name, relationship, and email address, e.g. Miguel Bravo, brother, miguelbravo@example.com",
         default_factory=list,
     )

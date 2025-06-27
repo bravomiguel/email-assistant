@@ -26,10 +26,16 @@ def route_model_output(state: State):
         # Otherwise, go directly to end
         return "__end__"
 
-    # if tool call is UpdateMemory, route to relevant memory update node based on memory type arg
-    memory_type = last_message.tool_calls[0].get("args", {}).get("memory_type", None)
-    if memory_type:
-        return memory_type
+    # Check if the tool call is UPDATE_MEMORY
+    tool_name = last_message.tool_calls[0].get("name", "")
+    if tool_name == "UPDATE_MEMORY":
+        # Get the memory_type argument
+        memory_type = last_message.tool_calls[0].get("args", {}).get("memory_type", None)
+        # Route to the appropriate node based on memory_type
+        if memory_type == "user_profile":
+            return "user_profile"
+        elif memory_type == "writing_style":
+            return "writing_style"
 
     # if tool call is GMAIL_REPLY_TO_THREAD, route to human review node
     if last_message.tool_calls[-1].get("name", "") in [
