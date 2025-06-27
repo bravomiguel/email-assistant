@@ -5,8 +5,9 @@ import uuid
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from langgraph.store.base import BaseStore
-from langchain_tavily import TavilySearch  # type: ignore[import-not-found]
+from langchain_tavily import TavilySearch
 from composio_langgraph import Action, ComposioToolSet
+from react_agent.dynamic_composio_toolset import DynamicEntityComposioToolSet
 
 from react_agent.configuration import Configuration
 
@@ -24,7 +25,8 @@ async def search(query: str) -> Optional[dict[str, Any]]:
 
 
 # Initialize ToolSet (assuming API key is in env)
-toolset = ComposioToolSet()
+# toolset = ComposioToolSet()
+toolset = DynamicEntityComposioToolSet()
 
 
 def filter_email_fetch_inputs(inputs: dict) -> dict:
@@ -91,12 +93,10 @@ gmail_fetch_emails = toolset.get_tools(
         "pre": {Action.GMAIL_FETCH_EMAILS: filter_email_fetch_inputs},
         "post": {Action.GMAIL_FETCH_EMAILS: filter_email_results},
     },
-    entity_id="miguel-bravo",
 )
 
 gmail_reply_to_thread = toolset.get_tools(
     actions=[Action.GMAIL_REPLY_TO_THREAD],
-    entity_id="miguel-bravo",
 )
 
 

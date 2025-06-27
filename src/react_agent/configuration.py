@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
-from typing import Annotated
+from typing import Annotated, Optional
 
 from langchain_core.runnables import ensure_config
 from langgraph.config import get_config
+from langchain_core.runnables import RunnableConfig
 
 from react_agent import prompts
 
@@ -25,6 +26,8 @@ class Configuration:
 
     model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
         default="groq/llama-3.3-70b-versatile",
+        # default="openai/gpt-4o-mini",
+        # default="openai/gpt-4.1-nano",
         metadata={
             "description": "The name of the language model to use for the agent's main interactions. "
             "Should be in the form: provider/model-name."
@@ -39,7 +42,8 @@ class Configuration:
     )
 
     user_id: str = field(
-        default="user-01",
+        # default="miguel-bravo",
+        default="miguel-bravo",
         metadata={"description": "The ID of the user."},
     )
 
