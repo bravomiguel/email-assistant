@@ -24,10 +24,9 @@ from react_agent.state import State
 from react_agent.configuration import Configuration
 from react_agent.tools import TOOLS
 
-gpt_4o_mini = ChatOpenAI(model="gpt-4o-mini")
+gpt_4o_mini = ChatOpenAI(model="gpt-4o-mini", disable_streaming=True)
 
 tools = ToolNode(TOOLS)
-
 
 async def call_model(
     state: State, config: RunnableConfig, store: BaseStore
@@ -268,9 +267,7 @@ async def generate_thread_title(state: State, config: RunnableConfig, store: Bas
     messages = state.messages
 
     # Invoke model to generate the title
-    response = await gpt_4o_mini.ainvoke(
-        [{"role": "system", "content": system_prompt}, *messages]
-    )
+    response = await gpt_4o_mini.ainvoke([{"role": "system", "content": system_prompt}, *messages])
 
     # Extract the title (trim to ensure it's exactly 4 words)
     title = " ".join(response.content.strip().split()[:4])
