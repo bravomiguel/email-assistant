@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 from typing import Annotated, Any, Callable, List, Literal, Optional, TypedDict, cast
 import uuid
 
@@ -7,7 +8,7 @@ from langchain_core.tools import InjectedToolArg, tool
 from langgraph.store.base import BaseStore
 from langchain_tavily import TavilySearch
 from composio_langgraph import Action, ComposioToolSet
-from react_agent.dynamic_composio_toolset import DynamicEntityComposioToolSet
+from react_agent.dynamic_composio_toolset import DynamicComposioToolSet
 
 from react_agent.configuration import Configuration
 from pydantic import BaseModel, Field
@@ -27,7 +28,7 @@ async def search_web(query: str) -> Optional[dict[str, Any]]:
 
 # Initialize ToolSet (assuming API key is in env)
 # toolset = ComposioToolSet()
-toolset = DynamicEntityComposioToolSet()
+toolset = DynamicComposioToolSet()
 
 
 def filter_email_fetch_inputs(inputs: dict) -> dict:
