@@ -4,10 +4,10 @@ from datetime import datetime
 
 
 class Connection(BaseModel):
-    person: Optional[str] = Field(
+    person: str = Field(
         description="The full name of the person.", default=None
     )
-    relation: Optional[str] = Field(
+    relation: str = Field(
         description="The relationship to the user, e.g. brother, colleague.",
         default=None,
     )
