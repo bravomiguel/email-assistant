@@ -69,6 +69,6 @@ langgraph dev
 
 This backend works with a Next.js frontend application that provides a user-friendly interface for interacting with the email assistant. The frontend repository is available at:
 
-https://github.com/bravomiguel/ea-frontend
+<https://github.com/bravomiguel/ea-frontend>
 
 Follow the instructions in the frontend repository to set up and connect it to this backend.
