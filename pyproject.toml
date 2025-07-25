@@ -25,6 +25,7 @@ dependencies = [
     # "asyncio>=0.0.1",
     "fastapi>=0.104.1",
     "uvicorn>=0.25.0",
+    "composio>=0.8.0",
 ]
 
 
