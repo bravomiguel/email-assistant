@@ -1,6 +1,5 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
 
 
 class Connection(BaseModel):
@@ -20,7 +19,8 @@ class Connection(BaseModel):
 class Profile(BaseModel):
     """This is the profile of the user you are chatting with."""
 
-    name: Optional[str] = Field(description="The name of the user.", default=None)
+    name: Optional[str] = Field(
+        description="The name of the user.", default=None)
     location: Optional[str] = Field(
         description="Where the user lives. Include place and state name, e.g. Austin, TX",
         default=None,

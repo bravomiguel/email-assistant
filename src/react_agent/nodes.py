@@ -152,7 +152,6 @@ async def human_review(state: State) -> Command:
 
 def user_profile(state: State, config: RunnableConfig, store: BaseStore):
     """Reflect on the chat history and update user profile."""
-
     # get user id
     user_id = Configuration.from_runnable_config(config).user_id
 
@@ -201,7 +200,6 @@ def user_profile(state: State, config: RunnableConfig, store: BaseStore):
 
 def writing_style(state: State, config: RunnableConfig, store: BaseStore):
     """Reflect on the chat history and update writing style instructions."""
-
     # get user id
     user_id = Configuration.from_runnable_config(config).user_id
 

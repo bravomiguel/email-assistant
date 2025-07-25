@@ -56,6 +56,12 @@ lint.select = [
     "UP",
 ]
 lint.ignore = [
+    "D100",
+    "D101",
+    "D202",
+    "T201",
+    "I001",
+    "UP045",
     "UP006",
     "UP007",
     # We actually do want to import from typing_extensions
